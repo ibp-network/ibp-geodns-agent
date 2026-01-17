@@ -1,0 +1,54 @@
+{
+    "System": {
+        "WorkDir": "/opt/ibp-geodns-agent",
+        "LogLevel": "Info",
+        "ConfigUrls": {
+            "StaticDNSConfig": "https://raw.githubusercontent.com/ibp-network/config/refs/heads/main/geodns-static.json",
+            "MembersConfig": "https://raw.githubusercontent.com/ibp-network/config/refs/heads/main/members_professional.json",
+            "ServicesConfig": "https://raw.githubusercontent.com/ibp-network/config/refs/heads/main/services_rpc.json",
+            "IaasPricingConfig": "https://raw.githubusercontent.com/ibp-network/config/refs/heads/main/services_rpc_iaaspricing.json",
+            "ServicesRequestsConfig": "https://raw.githubusercontent.com/ibp-network/config/refs/heads/main/services_rpc_requests.json"
+        },
+        "ConfigReloadTime": 3600,
+        "MinimumOfflineTime": 900
+    },
+    "Nats": {
+        "NodeID": "agent-1",
+        "Url": "nats://127.0.0.1:4222",
+        "User": "natsuser",
+        "Pass": "natspasswd"
+    },
+    "Mysql": {
+        "Host": "127.0.0.1",
+        "Port": "3306",
+        "User": "agent",
+        "Pass": "dbpasswd",
+        "DB": "agent"
+    },
+    "Matrix": {
+        "HomeServerURL": "https://matrix.org",
+        "Username": "matrixuser",
+        "Password": "matrixpasswd",
+        "RoomID": "matrixroom"
+    },
+    "CollatorApi": {
+        "ListenAddress": "0.0.0.0",
+        "ListenPort": "9000"
+    },
+    "Agent": {
+        "AgentID": "",
+        "ReportInterval": 60,
+        "CheckInterval": 30,
+        "HealthCheckPort": 8080,
+        "ServicesToMonitor": [
+            {
+                "Name": "Example HTTP Service",
+                "Type": "http",
+                "URL": "https://example.com/health",
+                "Timeout": 10,
+                "Interval": 60,
+                "ExpectedStatus": 200
+            }
+        ]
+    }
+}
