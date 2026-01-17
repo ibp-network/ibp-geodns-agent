@@ -1,0 +1,26 @@
+[Unit]
+Description=IBP GeoDNS – Active Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ibp
+Group=ibp
+WorkingDirectory=/opt/ibp-geodns-agent
+
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+
+ExecStart=/opt/ibp-geodns-agent/bin/ibp-agent --config /etc/ibpdns/agent.json
+Restart=on-failure
+RestartSec=5s
+
+Environment="SSL_CERT=/etc/letsencrypt/live/ibdash.dotters.network/fullchain.pem"
+Environment="SSL_KEY=/etc/letsencrypt/live/ibdash.dotters.network/privkey.pem"
+
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment="GO_ENV=production"
+
+[Install]
+WantedBy=multi-user.target
