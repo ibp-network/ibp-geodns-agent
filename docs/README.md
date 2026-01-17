@@ -139,7 +139,7 @@ Default port is 8080, configurable via `Agent.HealthCheckPort`.
 
 The agent follows the same structural patterns as other IBP GeoDNS repositories:
 
-- **src/cmd/agent/**: Main entry point and CLI
+- **src/main.go**: Main entry point and CLI
 - **src/config/**: Configuration loading and management
 - **src/agent/**: Core agent logic
 - **src/nats/**: NATS client wrapper using ibp-geodns-libs
