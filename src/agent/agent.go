@@ -15,7 +15,6 @@ import (
 // Agent represents the main agent instance
 type Agent struct {
 	config   *config.Config
-	nats     *nats.Client
 	reporter *reporter.Reporter
 	health   *health.Server
 	ctx      context.Context
@@ -26,17 +25,16 @@ type Agent struct {
 func New(cfg *config.Config) (*Agent, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Initialize NATS client
-	nc, err := nats.NewClient(cfg.Nats)
-	if err != nil {
+	// Initialize NATS connection using ibp-geodns-libs
+	if err := nats.Init(cfg.Nats); err != nil {
 		cancel()
-		return nil, fmt.Errorf("failed to create NATS client: %w", err)
+		return nil, fmt.Errorf("failed to initialize NATS: %w", err)
 	}
 
 	// Initialize reporter
-	rep, err := reporter.New(cfg, nc)
+	rep, err := reporter.New(cfg)
 	if err != nil {
-		nc.Close()
+		nats.Disconnect()
 		cancel()
 		return nil, fmt.Errorf("failed to create reporter: %w", err)
 	}
@@ -46,7 +44,6 @@ func New(cfg *config.Config) (*Agent, error) {
 
 	return &Agent{
 		config:   cfg,
-		nats:     nc,
 		reporter: rep,
 		health:   healthServer,
 		ctx:      ctx,
@@ -96,9 +93,7 @@ func (a *Agent) Stop(ctx context.Context) error {
 	}
 
 	// Close NATS connection
-	if err := a.nats.Close(); err != nil {
-		logging.Error("Error closing NATS connection", "error", err)
-	}
+	nats.Disconnect()
 
 	logging.Info("Agent stopped")
 	return nil

@@ -14,18 +14,17 @@ import (
 // Reporter handles reporting agent status and metrics
 type Reporter struct {
 	config *config.Config
-	nats   *nats.Client
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
 // Report represents a status report
 type Report struct {
-	AgentID    string                 `json:"agent_id"`
-	Timestamp  time.Time              `json:"timestamp"`
-	Status     string                 `json:"status"` // online, offline, degraded
-	Services   map[string]ServiceStatus `json:"services"`
-	Metrics    map[string]interface{} `json:"metrics,omitempty"`
+	AgentID   string                   `json:"agent_id"`
+	Timestamp time.Time                `json:"timestamp"`
+	Status    string                   `json:"status"` // online, offline, degraded
+	Services  map[string]ServiceStatus `json:"services"`
+	Metrics   map[string]interface{}   `json:"metrics,omitempty"`
 }
 
 // ServiceStatus represents the status of a monitored service
@@ -38,12 +37,11 @@ type ServiceStatus struct {
 }
 
 // New creates a new reporter
-func New(cfg *config.Config, nc *nats.Client) (*Reporter, error) {
+func New(cfg *config.Config) (*Reporter, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Reporter{
 		config: cfg,
-		nats:   nc,
 		ctx:    ctx,
 		cancel: cancel,
 	}, nil
@@ -103,9 +101,9 @@ func (r *Reporter) sendReport() {
 		return
 	}
 
-	// Publish to NATS subject
+	// Publish to NATS subject using ibp-geodns-libs
 	subject := fmt.Sprintf("agent.report.%s", r.config.Agent.AgentID)
-	if err := r.nats.Publish(subject, data); err != nil {
+	if err := nats.Publish(subject, data); err != nil {
 		logging.Error("Failed to publish report", "error", err, "subject", subject)
 		return
 	}
