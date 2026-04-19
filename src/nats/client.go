@@ -1,61 +1,116 @@
 package nats
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ibp-network/ibp-geodns-agent/src/config"
 	"github.com/ibp-network/ibp-geodns-agent/src/logging"
-	libsnats "github.com/ibp-network/ibp-geodns-libs/nats"
 	natsgo "github.com/nats-io/nats.go"
 )
 
-// Init initializes the NATS connection using ibp-geodns-libs
-// This should be called once at startup with the agent's NATS configuration
-// The libs package uses a global connection, so this sets it up for the agent
+var (
+	connMu sync.RWMutex
+	conn   *natsgo.Conn
+)
+
+func currentConnection() *natsgo.Conn {
+	connMu.RLock()
+	defer connMu.RUnlock()
+	return conn
+}
+
+// Init initializes the NATS connection using the agent configuration directly.
 func Init(cfg config.NatsConfig) error {
-	// The ibp-geodns-libs/nats package uses a global connection
-	// The Connect() function reads configuration from the libs config package
-	// We need to ensure the libs config is set up with our NATS settings first
-	
-	// TODO: Configure the libs config package with our NATS settings
-	// This might require setting up the libs config with the agent's NATS config
-	
-	// Connect using the libs package
-	if err := libsnats.Connect(); err != nil {
-		return err
+	if cfg.Url == "" {
+		return fmt.Errorf("NATS URL is required")
 	}
 
-	logging.Info("Connected to NATS via ibp-geodns-libs", "nodeID", cfg.NodeID)
+	connMu.Lock()
+	defer connMu.Unlock()
+
+	if conn != nil && !conn.IsClosed() {
+		return nil
+	}
+
+	opts := []natsgo.Option{
+		natsgo.Name("ibp-geodns-agent:" + cfg.NodeID),
+		natsgo.MaxReconnects(-1),
+		natsgo.ReconnectWait(2 * time.Second),
+		natsgo.Timeout(10 * time.Second),
+		natsgo.DisconnectErrHandler(func(_ *natsgo.Conn, err error) {
+			logging.Error("NATS disconnected", "error", err)
+		}),
+		natsgo.ReconnectHandler(func(c *natsgo.Conn) {
+			logging.Info("NATS reconnected", "url", c.ConnectedUrl())
+		}),
+		natsgo.ClosedHandler(func(c *natsgo.Conn) {
+			if err := c.LastError(); err != nil {
+				logging.Error("NATS connection closed", "error", err)
+			}
+		}),
+	}
+	if cfg.User != "" || cfg.Pass != "" {
+		opts = append(opts, natsgo.UserInfo(cfg.User, cfg.Pass))
+	}
+
+	connected, err := natsgo.Connect(cfg.Url, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to connect to NATS: %w", err)
+	}
+	conn = connected
+
+	logging.Info("Connected to NATS", "nodeID", cfg.NodeID, "url", connected.ConnectedUrl())
 	return nil
 }
 
-// Publish publishes a message to a subject using ibp-geodns-libs
+// Publish publishes a message to a subject.
 func Publish(subject string, data []byte) error {
-	return libsnats.Publish(subject, data)
+	active := currentConnection()
+	if active == nil || active.IsClosed() {
+		return natsgo.ErrConnectionClosed
+	}
+	return active.Publish(subject, data)
 }
 
-// Subscribe subscribes to a subject using ibp-geodns-libs
-func Subscribe(subject string, cb func(*libsnats.NatsMsg)) (*natsgo.Subscription, error) {
-	return libsnats.Subscribe(subject, cb)
+// Subscribe subscribes to a subject.
+func Subscribe(subject string, cb func(*natsgo.Msg)) (*natsgo.Subscription, error) {
+	active := currentConnection()
+	if active == nil || active.IsClosed() {
+		return nil, natsgo.ErrConnectionClosed
+	}
+	return active.Subscribe(subject, func(msg *natsgo.Msg) {
+		go cb(msg)
+	})
 }
 
-// Request sends a request and waits for a response using ibp-geodns-libs
-func Request(subject string, data []byte, timeout time.Duration) (*libsnats.NatsMsg, error) {
-	return libsnats.Request(subject, data, timeout)
+// Request sends a request and waits for a response.
+func Request(subject string, data []byte, timeout time.Duration) (*natsgo.Msg, error) {
+	active := currentConnection()
+	if active == nil || active.IsClosed() {
+		return nil, natsgo.ErrConnectionClosed
+	}
+	return active.Request(subject, data, timeout)
 }
 
-// GetConnection returns the underlying NATS connection for advanced usage
+// GetConnection returns the underlying NATS connection for advanced usage.
 func GetConnection() *natsgo.Conn {
-	return libsnats.GetConnection()
+	return currentConnection()
 }
 
-// Disconnect closes the NATS connection
+// Disconnect closes the NATS connection.
 func Disconnect() {
-	libsnats.Disconnect()
+	connMu.Lock()
+	defer connMu.Unlock()
+	if conn != nil && !conn.IsClosed() {
+		conn.Close()
+	}
+	conn = nil
 }
 
-// IsConnected returns whether the client is connected
+// IsConnected returns whether the client is connected.
 func IsConnected() bool {
-	conn := libsnats.GetConnection()
-	return conn != nil && conn.IsConnected()
+	active := currentConnection()
+	return active != nil && active.IsConnected()
 }

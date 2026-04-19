@@ -23,11 +23,8 @@ type Agent struct {
 
 // New creates a new agent instance
 func New(cfg *config.Config) (*Agent, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	// Initialize NATS connection using ibp-geodns-libs
 	if err := nats.Init(cfg.Nats); err != nil {
-		cancel()
 		return nil, fmt.Errorf("failed to initialize NATS: %w", err)
 	}
 
@@ -35,7 +32,6 @@ func New(cfg *config.Config) (*Agent, error) {
 	rep, err := reporter.New(cfg)
 	if err != nil {
 		nats.Disconnect()
-		cancel()
 		return nil, fmt.Errorf("failed to create reporter: %w", err)
 	}
 
@@ -46,14 +42,19 @@ func New(cfg *config.Config) (*Agent, error) {
 		config:   cfg,
 		reporter: rep,
 		health:   healthServer,
-		ctx:      ctx,
-		cancel:   cancel,
 	}, nil
 }
 
 // Start starts the agent
 func (a *Agent) Start(ctx context.Context) error {
 	logging.Info("Starting agent", "agentID", a.config.Agent.AgentID)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if a.cancel != nil {
+		a.cancel()
+	}
+	a.ctx, a.cancel = context.WithCancel(ctx)
 
 	// Start health server
 	if err := a.health.Start(); err != nil {
@@ -61,15 +62,17 @@ func (a *Agent) Start(ctx context.Context) error {
 	}
 
 	// Start reporter
-	if err := a.reporter.Start(ctx); err != nil {
+	if err := a.reporter.Start(a.ctx); err != nil {
 		return fmt.Errorf("failed to start reporter: %w", err)
 	}
 
 	// Start monitoring loop
-	go a.monitorLoop(ctx)
+	go a.monitorLoop(a.ctx)
 
 	// Start config reload watcher
-	go a.configReloadLoop(ctx)
+	go a.configReloadLoop(a.ctx)
+
+	a.health.SetReady(true)
 
 	logging.Info("Agent started successfully")
 	return nil
@@ -80,7 +83,10 @@ func (a *Agent) Stop(ctx context.Context) error {
 	logging.Info("Stopping agent")
 
 	// Cancel context
-	a.cancel()
+	if a.cancel != nil {
+		a.cancel()
+	}
+	a.health.SetReady(false)
 
 	// Stop reporter
 	if err := a.reporter.Stop(ctx); err != nil {
@@ -131,7 +137,7 @@ func (a *Agent) checkService(service config.ServiceConfig) {
 	// This would implement actual service checking logic
 	// For now, it's a placeholder
 	logging.Debug("Checking service", "service", service.Name, "type", service.Type)
-	
+
 	// TODO: Implement actual health checks based on service type
 	// - HTTP: Make HTTP request, check status code
 	// - TCP: Check TCP connection

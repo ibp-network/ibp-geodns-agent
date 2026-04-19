@@ -24,7 +24,7 @@ var (
 // Init initializes the logger
 func Init(logLevelOverride ...string) {
 	logger = log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds)
-	
+
 	if len(logLevelOverride) > 0 && logLevelOverride[0] != "" {
 		SetLevel(logLevelOverride[0])
 	}
@@ -59,7 +59,7 @@ func Debug(msg string, args ...interface{}) {
 		if len(args) > 0 {
 			logger.Printf("[DEBUG] "+msg, args...)
 		} else {
-			logger.Printf("[DEBUG] " + msg)
+			logger.Print("[DEBUG] " + msg)
 		}
 	}
 }
@@ -70,7 +70,7 @@ func Info(msg string, args ...interface{}) {
 		if len(args) > 0 {
 			logger.Printf("[INFO] "+msg, args...)
 		} else {
-			logger.Printf("[INFO] " + msg)
+			logger.Print("[INFO] " + msg)
 		}
 	}
 }
@@ -81,7 +81,7 @@ func Warn(msg string, args ...interface{}) {
 		if len(args) > 0 {
 			logger.Printf("[WARN] "+msg, args...)
 		} else {
-			logger.Printf("[WARN] " + msg)
+			logger.Print("[WARN] " + msg)
 		}
 	}
 }
@@ -92,7 +92,7 @@ func Error(msg string, args ...interface{}) {
 		if len(args) > 0 {
 			logger.Printf("[ERROR] "+msg, args...)
 		} else {
-			logger.Printf("[ERROR] " + msg)
+			logger.Print("[ERROR] " + msg)
 		}
 	}
 }
@@ -102,7 +102,7 @@ func Fatal(msg string, args ...interface{}) {
 	if len(args) > 0 {
 		logger.Printf("[FATAL] "+msg, args...)
 	} else {
-		logger.Printf("[FATAL] " + msg)
+		logger.Print("[FATAL] " + msg)
 	}
 	os.Exit(1)
 }

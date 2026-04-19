@@ -38,21 +38,24 @@ type ServiceStatus struct {
 
 // New creates a new reporter
 func New(cfg *config.Config) (*Reporter, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &Reporter{
 		config: cfg,
-		ctx:    ctx,
-		cancel: cancel,
 	}, nil
 }
 
 // Start starts the reporter
 func (r *Reporter) Start(ctx context.Context) error {
 	logging.Info("Starting reporter")
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if r.cancel != nil {
+		r.cancel()
+	}
+	r.ctx, r.cancel = context.WithCancel(ctx)
 
 	// Start reporting loop
-	go r.reportLoop(ctx)
+	go r.reportLoop(r.ctx)
 
 	return nil
 }
@@ -60,7 +63,9 @@ func (r *Reporter) Start(ctx context.Context) error {
 // Stop stops the reporter
 func (r *Reporter) Stop(ctx context.Context) error {
 	logging.Info("Stopping reporter")
-	r.cancel()
+	if r.cancel != nil {
+		r.cancel()
+	}
 	return nil
 }
 
