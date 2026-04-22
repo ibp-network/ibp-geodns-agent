@@ -4,17 +4,17 @@ A self-hosted active agent for monitoring ancillary services and reporting SLA m
 
 ## Overview
 
-`ibp-geodns-agent` is a system service that runs on machines to be monitored. It performs health checks on configured services, collects metrics, and reports status and SLA information to the central monitoring system via NATS using the `ibp-geodns-libs` library.
+`ibp-geodns-agent` is an early-stage system service that runs on machines to be monitored. The current build provides NATS connectivity, periodic self-report publication, and health endpoints; the service-checking and remote-config portions are scaffolding and should not be treated as production-ready features yet.
 
 ## Features
 
-- **Service Monitoring**: Monitor HTTP, TCP, and custom service endpoints
-- **Self-Reporting**: Automatically reports agent status and service health via NATS
-- **SLA Tracking**: Tracks uptime, latency, and availability metrics
-- **Hot Config Reload**: Supports configuration reload without restart
 - **Health Endpoints**: Provides HTTP health check endpoints for orchestration
+- **NATS Connectivity**: Maintains a long-lived NATS connection for future agent integrations
+- **Periodic Self-Reporting**: Publishes heartbeat-style agent reports on a configurable interval
+- **Structured Logging**: Key/value logging with configurable levels
+- **Scaffolded Monitoring**: Service monitoring hooks exist, but concrete HTTP/TCP/custom checks are not implemented in this build
+- **Scaffolded Remote Config**: Remote configuration fields are parsed, but remote config fetching/merging is not implemented yet
 - **System Service**: Installable as a systemd service
-- **Structured Logging**: JSON-formatted logs with configurable levels
 
 ## Requirements
 
@@ -108,12 +108,12 @@ Configuration is provided via a JSON file. See `config/config.json` for an examp
 
 - **System.WorkDir**: Working directory for the agent
 - **System.LogLevel**: Logging level (Debug, Info, Warn, Error, Fatal)
-- **System.ConfigReloadTime**: Interval in seconds to reload remote configuration
+- **System.ConfigReloadTime**: Interval in seconds reserved for future remote configuration reload support
 - **Nats**: NATS connection configuration
 - **Agent.AgentID**: Unique identifier for this agent instance
 - **Agent.ReportInterval**: Interval in seconds between status reports
-- **Agent.CheckInterval**: Interval in seconds between service health checks
-- **Agent.ServicesToMonitor**: List of services to monitor
+- **Agent.CheckInterval**: Interval in seconds reserved for future service checks
+- **Agent.ServicesToMonitor**: Service definitions for the planned monitoring subsystem
 
 ## Usage
 
@@ -143,7 +143,7 @@ The agent follows the same structural patterns as other IBP GeoDNS repositories:
 - **src/config/**: Configuration loading and management
 - **src/agent/**: Core agent logic
 - **src/nats/**: NATS client wrapper using ibp-geodns-libs
-- **src/reporter/**: Status reporting logic
+- **src/reporter/**: Periodic self-report publishing
 - **src/health/**: Health check server
 - **src/logging/**: Structured logging
 
@@ -152,7 +152,7 @@ The agent follows the same structural patterns as other IBP GeoDNS repositories:
 This agent uses `ibp-geodns-libs` for:
 
 - NATS connectivity and messaging
-- Configuration management with remote config support
+- Shared config structures used by the wider IBP GeoDNS stack
 - Common utilities and patterns
 
 ## Development

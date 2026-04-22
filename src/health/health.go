@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 
@@ -46,15 +47,18 @@ func (s *Server) Start() error {
 		Addr:    fmt.Sprintf(":%d", s.port),
 		Handler: mux,
 	}
+	listener, err := net.Listen("tcp", s.server.Addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on health port %d: %w", s.port, err)
+	}
 
 	go func() {
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			logging.Error("Health server error", "error", err)
 		}
 	}()
 
 	s.started = true
-	s.ready = true
 	logging.Info("Health server started", "port", s.port)
 
 	return nil

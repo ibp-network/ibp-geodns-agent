@@ -11,14 +11,37 @@ import (
 )
 
 var (
-	connMu sync.RWMutex
-	conn   *natsgo.Conn
+	connMu      sync.RWMutex
+	conn        *natsgo.Conn
+	callbackSem = make(chan struct{}, 128)
 )
 
 func currentConnection() *natsgo.Conn {
 	connMu.RLock()
 	defer connMu.RUnlock()
 	return conn
+}
+
+func cloneMsg(msg *natsgo.Msg) *natsgo.Msg {
+	if msg == nil {
+		return nil
+	}
+
+	msgCopy := &natsgo.Msg{
+		Subject: msg.Subject,
+		Reply:   msg.Reply,
+	}
+	if msg.Data != nil {
+		msgCopy.Data = append([]byte(nil), msg.Data...)
+	}
+	if msg.Header != nil {
+		msgCopy.Header = make(natsgo.Header, len(msg.Header))
+		for key, values := range msg.Header {
+			msgCopy.Header[key] = append([]string(nil), values...)
+		}
+	}
+
+	return msgCopy
 }
 
 // Init initializes the NATS connection using the agent configuration directly.
@@ -81,7 +104,17 @@ func Subscribe(subject string, cb func(*natsgo.Msg)) (*natsgo.Subscription, erro
 		return nil, natsgo.ErrConnectionClosed
 	}
 	return active.Subscribe(subject, func(msg *natsgo.Msg) {
-		go cb(msg)
+		callbackSem <- struct{}{}
+		msgCopy := cloneMsg(msg)
+		go func() {
+			defer func() {
+				<-callbackSem
+				if r := recover(); r != nil {
+					logging.Error("NATS callback panic", "subject", msgCopy.Subject, "panic", r)
+				}
+			}()
+			cb(msgCopy)
+		}()
 	})
 }
 

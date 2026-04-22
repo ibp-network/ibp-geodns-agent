@@ -21,6 +21,8 @@ type Agent struct {
 	cancel   context.CancelFunc
 }
 
+const defaultCheckIntervalSeconds = 30
+
 // New creates a new agent instance
 func New(cfg *config.Config) (*Agent, error) {
 	// Initialize NATS connection using ibp-geodns-libs
@@ -63,6 +65,11 @@ func (a *Agent) Start(ctx context.Context) error {
 
 	// Start reporter
 	if err := a.reporter.Start(a.ctx); err != nil {
+		a.health.SetReady(false)
+		_ = a.health.Stop(context.Background())
+		if a.cancel != nil {
+			a.cancel()
+		}
 		return fmt.Errorf("failed to start reporter: %w", err)
 	}
 
@@ -107,7 +114,13 @@ func (a *Agent) Stop(ctx context.Context) error {
 
 // monitorLoop runs the main monitoring loop
 func (a *Agent) monitorLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(a.config.Agent.CheckInterval) * time.Second)
+	intervalSec := a.config.Agent.CheckInterval
+	if intervalSec <= 0 {
+		logging.Warn("Invalid check interval; using default", "configuredSeconds", intervalSec, "defaultSeconds", defaultCheckIntervalSeconds)
+		intervalSec = defaultCheckIntervalSeconds
+	}
+
+	ticker := time.NewTicker(time.Duration(intervalSec) * time.Second)
 	defer ticker.Stop()
 
 	// Run initial check

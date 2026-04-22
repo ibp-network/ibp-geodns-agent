@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ibp-network/ibp-geodns-libs/config"
+	"github.com/ibp-network/ibp-geodns-agent/src/logging"
 )
 
 // Config represents the agent configuration structure
@@ -119,7 +120,7 @@ func Load(configPath string) (*Config, error) {
 	// Load remote config if URLs are provided
 	if err := cfg.loadRemoteConfig(); err != nil {
 		// Log warning but don't fail - remote config is optional
-		fmt.Printf("Warning: failed to load remote config: %v\n", err)
+		logging.Warn("Failed to load remote config", "error", err)
 	}
 
 	configMu.Lock()
@@ -173,17 +174,38 @@ func (c *Config) Validate() error {
 	if c.Nats.NodeID == "" {
 		return fmt.Errorf("NATS NodeID is required")
 	}
+	if c.Agent.AgentID == "" {
+		return fmt.Errorf("AgentID is required")
+	}
+	if c.Agent.ReportInterval <= 0 {
+		return fmt.Errorf("Agent.ReportInterval must be greater than 0")
+	}
+	if c.Agent.CheckInterval <= 0 {
+		return fmt.Errorf("Agent.CheckInterval must be greater than 0")
+	}
+	if c.Agent.HealthCheckPort <= 0 || c.Agent.HealthCheckPort > 65535 {
+		return fmt.Errorf("Agent.HealthCheckPort must be between 1 and 65535")
+	}
+	if c.System.ConfigReloadTime < 0 {
+		return fmt.Errorf("System.ConfigReloadTime cannot be negative")
+	}
 	return nil
 }
 
 // loadRemoteConfig loads configuration from remote URLs using ibp-geodns-libs
 func (c *Config) loadRemoteConfig() error {
-	// Use ibp-geodns-libs config loader for remote config
-	// For now, this is a placeholder that would integrate with ibp-geodns-libs
-	// The actual implementation would use the libs to fetch and merge remote configs
-	_ = config.Config{}
+	if c.System.ConfigUrls.StaticDNSConfig == "" &&
+		c.System.ConfigUrls.MembersConfig == "" &&
+		c.System.ConfigUrls.ServicesConfig == "" &&
+		c.System.ConfigUrls.IaasPricingConfig == "" &&
+		c.System.ConfigUrls.ServicesRequestsConfig == "" {
+		return nil
+	}
 
-	return nil
+	// Use ibp-geodns-libs config loader for remote config
+	// This build does not yet implement remote config merging.
+	_ = config.Config{}
+	return fmt.Errorf("remote config loading is not implemented yet")
 }
 
 // Reload reloads configuration from file

@@ -18,6 +18,8 @@ type Reporter struct {
 	cancel context.CancelFunc
 }
 
+const defaultReportIntervalSeconds = 60
+
 // Report represents a status report
 type Report struct {
 	AgentID   string                   `json:"agent_id"`
@@ -71,7 +73,13 @@ func (r *Reporter) Stop(ctx context.Context) error {
 
 // reportLoop periodically sends reports
 func (r *Reporter) reportLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(r.config.Agent.ReportInterval) * time.Second)
+	intervalSec := r.config.Agent.ReportInterval
+	if intervalSec <= 0 {
+		logging.Warn("Invalid report interval; using default", "configuredSeconds", intervalSec, "defaultSeconds", defaultReportIntervalSeconds)
+		intervalSec = defaultReportIntervalSeconds
+	}
+
+	ticker := time.NewTicker(time.Duration(intervalSec) * time.Second)
 	defer ticker.Stop()
 
 	// Send initial report
